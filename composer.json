@@ -1,0 +1,27 @@
+{
+  "name": "baagee/DHTSpider",
+  "description": "PHP DHT Spider",
+  "type": "project",
+  "minimum-stability": "dev",
+  "license": "MIT",
+  "keywords": [
+    "PHP",
+    "DHT",
+    "Spider"
+  ],
+  "authors": [
+    {
+      "name": "BaAGee",
+      "email": "2274313786@qq.com"
+    }
+  ],
+  "require": {
+    "php": ">=7.1",
+    "rych/bencode": "^1.0"
+  },
+  "autoload": {
+    "psr-4": {
+      "DhtSpider\\": "src/"
+    }
+  }
+}
