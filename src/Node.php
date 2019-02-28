@@ -1,21 +1,38 @@
 <?php
 /**
- * Desc:
+ * Desc: Node节点
  * User: baagee
  * Date: 2019/2/26
  * Time: 下午7:22
  */
 
-namespace DhtSpider\Dht;
+namespace DHT;
 
-use DhtSpider\Tool\Tool;
-
+/**
+ * Class Node
+ * @package DHT
+ */
 class Node
 {
-    protected $ip     = '';
-    protected $port   = 0;
+    /**
+     * @var string
+     */
+    protected $ip = '';
+    /**
+     * @var int
+     */
+    protected $port = 0;
+    /**
+     * @var string
+     */
     protected $nodeId = '';
 
+    /**
+     * Node constructor.
+     * @param        $ip
+     * @param        $port
+     * @param string $nodeId
+     */
     public function __construct($ip, $port, $nodeId = '')
     {
         $this->ip   = $ip;
@@ -24,6 +41,15 @@ class Node
             $nodeId = Tool::getNodeId();
         }
         $this->nodeId = $nodeId;
+    }
+
+    /**
+     * @param $name
+     * @return mixed
+     */
+    public function __get($name)
+    {
+        return $this->$name;
     }
 
     /**

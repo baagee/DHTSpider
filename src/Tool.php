@@ -6,7 +6,7 @@
  * Time: 下午7:17
  */
 
-namespace DhtSpider\Tool;
+namespace DHT;
 
 class Tool
 {
@@ -19,17 +19,21 @@ class Tool
     {
         return hexdec(bin2hex($str));
     }
-    //
-    // public static function character($data)
-    // {
-    //     if (!empty($data)) {
-    //         $fileType = mb_detect_encoding($data, array('UTF-8', 'GBK', 'LATIN1', 'BIG5'));
-    //         if ($fileType != 'UTF-8') {
-    //             $data = mb_convert_encoding($data, 'utf-8', $fileType);
-    //         }
-    //     }
-    //     return $data;
-    // }
+
+    /**
+     * @param $data
+     * @return null|string|string[]
+     */
+    public static function character($data)
+    {
+        if (!empty($data)) {
+            $fileType = mb_detect_encoding($data, array('UTF-8', 'GBK', 'LATIN1', 'BIG5'));
+            if ($fileType != 'UTF-8') {
+                $data = mb_convert_encoding($data, 'utf-8', $fileType);
+            }
+        }
+        return $data;
+    }
 
     /**
      * 生成随机字符串
@@ -86,7 +90,7 @@ class Tool
     public static function decodeNodes($msg)
     {
         // 先判断数据长度是否正确
-        if ((strlen($msg) % 26) != 0){
+        if ((strlen($msg) % 26) != 0) {
             return array();
         }
         $n = array();
