@@ -12,20 +12,41 @@ use Rych\Bencode\Bencode;
 use Rych\Bencode\Decoder;
 use Swoole\Process;
 
+/**
+ * Class Spider
+ * @package DHT
+ */
 class Spider
 {
+    /**
+     * @var Node 爬虫自身的node
+     */
     protected $node = null;
 
+    /**
+     * @var array 初始的node
+     */
     protected $startNodes = [
         ['ip' => 'router.bittorrent.com', 'port' => 6881],
         ['ip' => 'dht.transmissionbt.com', 'port' => 6881],
         ['ip' => 'router.utorrent.com', 'port' => 6881]
     ];
 
+    /**
+     * @var UdpServer
+     */
     protected $udpServer = null;
 
+    /**
+     * @var array 保存获取到的node节点
+     */
     protected static $nodes = [];
 
+    /**
+     * Spider constructor.
+     * @param UdpServer $server
+     * @param array     $startNodes
+     */
     public function __construct(UdpServer $server, array $startNodes = [])
     {
         $this->udpServer  = $server;
@@ -33,6 +54,9 @@ class Spider
         $this->startNodes = array_merge($this->startNodes, $startNodes);
     }
 
+    /**
+     * 开始爬取
+     */
     public function crawl()
     {
         Log::info(__METHOD__ . ' 开始运行');
@@ -42,29 +66,37 @@ class Spider
         $this->udpServer->on('Packet', function ($server, $data, $client_info) {
             $this->onPacket($server, $data, $client_info);
         });
-        // $this->udpServer->on('task', function ($server, $taskId, $reactorId, $data) {
-        //     echo '222' . PHP_EOL;
-        // });
-        $this->udpServer->on('finish', function ($server, $task_id, $data) {
-            echo "AsyncTask[$task_id] finished: $data" . PHP_EOL;
-        });
         $this->udpServer->start();
     }
 
+    /**
+     * worker进程开始
+     * @param $server
+     * @param $work_id
+     */
     public function onWorkStart($server, $work_id)
     {
         Log::info(__METHOD__ . '  work_id=' . $work_id);
         swoole_timer_tick(3000, function ($timer_id) {
-            if (count(self::$nodes) == 0) {
+            $num = count(self::$nodes);
+            Log::info('当前node数量：' . $num);
+            if ($num == 0) {
                 $this->joinDhtNet();
             }
             $this->autoFindNode();
         });
     }
 
+    /**
+     * 接收到数据时
+     * @param $server
+     * @param $data
+     * @param $client_info
+     * @return bool
+     */
     public function onPacket($server, $data, $client_info)
     {
-        Log::info(__METHOD__ . ' client_info=' . $client_info['address'] . ':' . $client_info['port']);
+        // Log::info(__METHOD__ . ' client_info=' . $client_info['address'] . ':' . $client_info['port']);
         if (strlen($data) == 0) {
             return false;
         }
@@ -76,7 +108,7 @@ class Spider
             if ($msg['y'] == 'r') {
                 // 如果是回复, 且包含nodes信息 添加到路由表
                 if (array_key_exists('nodes', $msg['r'])) {
-                    // $this->batchAddNode($msg);
+                    $this->batchAddNode($msg);
                 }
             } elseif ($msg['y'] == 'q') {
                 // 如果是请求, 则执行请求判断
@@ -87,6 +119,31 @@ class Spider
         }
     }
 
+    /**
+     * 批量添加node
+     * @param $msg
+     */
+    protected function batchAddNode($msg)
+    {
+        Log::info(__METHOD__.' 批量添加node');
+        // 先检查接收到的信息是否正确
+        if (!isset($msg['r']['nodes']) || !isset($msg['r']['nodes'][1]))
+            return;
+        // 对nodes数据进行解码
+        $nodes = Tool::decodeNodes($msg['r']['nodes']);
+        // 对nodes循环处理
+        foreach ($nodes as $node) {
+            // 将node加入到路由表中
+            self::addNode($node);
+        }
+    }
+
+    /**
+     * 响应
+     * @param $msg
+     * @param $ip
+     * @param $port
+     */
     protected function response($msg, $ip, $port)
     {
         switch ($msg['q']) {
@@ -111,6 +168,13 @@ class Spider
         }
     }
 
+    /**
+     * 发送信息
+     * @param $msg
+     * @param $ip
+     * @param $port
+     * @return bool
+     */
     protected function sendMessage($msg, $ip, $port)
     {
         if (!filter_var($ip, FILTER_VALIDATE_IP)) {
@@ -122,6 +186,9 @@ class Spider
         return true;
     }
 
+    /**
+     * 加入网络
+     */
     protected function joinDhtNet()
     {
         Log::info(__METHOD__ . ' 自动重新加入网络');
@@ -133,6 +200,10 @@ class Spider
         }
     }
 
+    /**
+     *  添加node
+     * @param Node $node
+     */
     protected function addNode(Node $node)
     {
         $hexKey = hexdec($node->getNodeId());
@@ -142,6 +213,9 @@ class Spider
         self::$nodes[$hexKey] = $node;
     }
 
+    /**
+     * 自动查找node节点
+     */
     protected function autoFindNode()
     {
         Log::info(__METHOD__ . ' 自动查找节点');
@@ -153,6 +227,11 @@ class Spider
         }
     }
 
+    /**
+     * 获取一定数量的node
+     * @param $count
+     * @return array
+     */
     protected function getNodes($count)
     {
         if (count(self::$nodes) <= $count) {
@@ -161,6 +240,12 @@ class Spider
         return array_slice(self::$nodes, 0, $count);
     }
 
+    /**
+     * 查找node
+     * @param      $ip
+     * @param      $port
+     * @param null $node_id
+     */
     protected function findNode($ip, $port, $node_id = null)
     {
         if (is_null($node_id)) {
@@ -184,6 +269,11 @@ class Spider
         $this->sendMessage($msg, $ip, $port);
     }
 
+    /**
+     * @param $msg
+     * @param $ip
+     * @param $port
+     */
     protected function onPing($msg, $ip, $port)
     {
         Log::info(__METHOD__ . ' 朋友【' . $ip . '】正在确认你是否在线');
@@ -203,6 +293,11 @@ class Spider
         $this->sendMessage($msg, $ip, $port);
     }
 
+    /**
+     * @param $msg
+     * @param $ip
+     * @param $port
+     */
     protected function onFindNode($msg, $ip, $port)
     {
         Log::info(__METHOD__ . ' 朋友【' . $ip . '】向你发出寻找节点的请求');
@@ -223,6 +318,11 @@ class Spider
         $this->sendMessage($msg, $ip, $port);
     }
 
+    /**
+     * @param $msg
+     * @param $ip
+     * @param $port
+     */
     protected function onGetPeers($msg, $ip, $port)
     {
         Log::info(__METHOD__ . '朋友【' . $ip . '】向你发出查找资源的请求');
@@ -248,6 +348,12 @@ class Spider
         $this->sendMessage($msg, $ip, $port);
     }
 
+    /**
+     * @param $msg
+     * @param $ip
+     * @param $port
+     * @return bool
+     */
     protected function onAnnouncePeer($msg, $ip, $port)
     {
         Log::info(__METHOD__ . '朋友【' . $ip . '】找到资源了, 通知你一声');
@@ -257,7 +363,7 @@ class Spider
 
         // 验证token是否正确
         if (substr($infoHash, 0, 3) != $token) {
-            Log::warning(__METHOD__ . 'Token 不正确');
+            // Log::warning(__METHOD__ . 'Token 不正确');
             return false;
         }
 
@@ -285,6 +391,12 @@ class Spider
         $this->getMetaData($ip, $port, $infoHash);
     }
 
+    /**
+     * 获取磁力链接信息
+     * @param $ip
+     * @param $port
+     * @param $infoHash
+     */
     protected function getMetaData($ip, $port, $infoHash)
     {
         $process = new Process(function (Process $worker) use ($ip, $port, $infoHash) {
@@ -297,7 +409,9 @@ class Spider
                     $rs = MetaData::downloadMetadata($client, $infoHash);
                     $client->close();
                     // todo 记录结果
-                    Log::metadata(json_encode($rs, JSON_UNESCAPED_UNICODE));
+                    if ($rs !== false) {
+                        Log::metadata(json_encode($rs, JSON_UNESCAPED_UNICODE));
+                    }
                 }
                 $worker->exit(0);
             } catch (\Throwable $e) {

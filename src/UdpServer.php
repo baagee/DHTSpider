@@ -22,7 +22,7 @@ class UdpServer
     protected $config = [
         'ip'         => '0.0.0.0',
         'port'       => 7890,
-        'worker_num' => 1,
+        'worker_num' => 3,
         'daemonize'  => false,
     ];
 
@@ -48,7 +48,7 @@ class UdpServer
             'heartbeat_check_interval' => 5, //启用心跳检测，此选项表示每隔多久轮循一次，单位为秒
             'heartbeat_idle_time'      => 10, //与heartbeat_check_interval配合使用。表示连接最大允许空闲的时间
             // 'task_worker_num'          => $this->config['task_worker_num'],
-            'task_max_request'         => 0
+            // 'task_max_request'         => 0
         ]);
     }
 
