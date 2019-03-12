@@ -8,8 +8,9 @@
 
 namespace DHT;
 
-use Rych\Bencode\Decoder;
-use Rych\Bencode\Encoder;
+use DHT\Bcode\Decoder;
+use DHT\Bcode\Encoder;
+use SandFox\Bencode\Bencode;
 use Swoole\Client;
 
 /**
@@ -56,6 +57,7 @@ class MetaData
 
         $metadata_size = self::getMetadataSize($packet);
         if ($metadata_size > self::$PIECE_LENGTH * 1000) {
+            Log::error(__METHOD__ . __LINE__);
             return false;
         }
         $metadata  = array();
@@ -77,12 +79,14 @@ class MetaData
             $dict = Decoder::decode(substr($ee, strpos($packet, "d")));
 
             if (isset($dict['msg_type']) && $dict['msg_type'] != 1) {
+                Log::error(__METHOD__ . __LINE__);
                 return false;
             }
 
             $_metadata = substr($packet, strpos($packet, "ee") + 2);
 
             if (strlen($_metadata) > self::$PIECE_LENGTH) {
+                Log::error(__METHOD__ . __LINE__);
                 return false;
             }
 
@@ -90,8 +94,8 @@ class MetaData
         }
         $metadata = implode('', $metadata);
 
-        $_data     = [];
         $metadata  = Decoder::decode($metadata);
+        $_data     = [];
         $_infohash = strtoupper(bin2hex($infoHash));
         if (isset($metadata['name']) && $metadata['name'] != '') {
             $_data['name']        = Tool::character($metadata['name']);
@@ -103,6 +107,8 @@ class MetaData
             $_data['magnetUrl'] = 'magnet:?xt=urn:btih:' . $_infohash;
             unset($metadata);
         } else {
+            $client->close();
+            Log::error(__METHOD__ . __LINE__);
             return false;
         }
         return $_data;
@@ -126,6 +132,7 @@ class MetaData
 
         $rs = $client->send($_msg);
         if ($rs === false) {
+            Log::error(__METHOD__ . __LINE__);
             return false;
         } else {
             return true;
@@ -140,20 +147,24 @@ class MetaData
     {
         $data_length = $client->recv(4, true);
         if ($data_length === false) {
+            Log::error(__METHOD__ . __LINE__);
             return false;
         }
 
         if (strlen($data_length) != 4) {
+            Log::error(__METHOD__ . __LINE__);
             return false;
         }
 
         $data_length = intval(unpack('N', $data_length)[1]);
 
         if ($data_length == 0) {
+            Log::error(__METHOD__ . __LINE__);
             return false;
         }
 
         if ($data_length > self::$PIECE_LENGTH * 1000) {
+            Log::error(__METHOD__ . __LINE__);
             return false;
         }
 
@@ -162,6 +173,7 @@ class MetaData
             if ($data_length > 8192) {
                 if (($_data = $client->recv(8192, true)) == false) {
                     //echo $data_length.PHP_EOL;
+                    Log::error(__METHOD__ . __LINE__);
                     return false;
                 } else {
                     $data        .= $_data;
@@ -169,6 +181,7 @@ class MetaData
                 }
             } else {
                 if (($_data = $client->recv($data_length, true)) == false) {
+                    Log::error(__METHOD__ . __LINE__);
                     return false;
                 } else {
                     $data .= $_data;
@@ -193,10 +206,12 @@ class MetaData
         $packet      = $bt_header . $ext_bytes . $infohash . $peer_id;
         $rs          = $client->send($packet);
         if ($rs === false) {
+            Log::error(__METHOD__ . __LINE__);
             return false;
         }
         $data = $client->recv(4096, 0);
         if ($data === false) {
+            Log::error(__METHOD__ . __LINE__);
             return false;
         }
         return $data;
@@ -212,16 +227,19 @@ class MetaData
         $bt_header_len = ord(substr($packet, 0, 1));
         $packet        = substr($packet, 1);
         if ($bt_header_len != strlen(self::$_bt_protocol)) {
+            Log::error(__METHOD__ . __LINE__);
             return false;
         }
         $bt_header = substr($packet, 0, $bt_header_len);
         $packet    = substr($packet, $bt_header_len);
         if ($bt_header != self::$_bt_protocol) {
+            Log::error(__METHOD__ . __LINE__);
             return false;
         }
         $packet   = substr($packet, 8);
         $infohash = substr($packet, 0, 20);
         if ($infohash != $self_infohash) {
+            Log::error(__METHOD__ . __LINE__);
             return false;
         }
         return true;
@@ -233,7 +251,7 @@ class MetaData
      */
     protected static function sendExtHandshake(Client $client)
     {
-        $msg     = chr(self::$BT_MSG_ID) . chr(self::$EXT_HANDSHAKE_ID) . Encoder::encode(array("m" => array("ut_metadata" => 1)));
+        $msg     = chr(self::$BT_MSG_ID) . chr(self::$EXT_HANDSHAKE_ID) . Bcode\Encoder::encode(array("m" => array("ut_metadata" => 1)));
         $msg_len = pack("I", strlen($msg));
         if (!BIG_ENDIAN) {
             $msg_len = strrev($msg_len);
@@ -241,10 +259,12 @@ class MetaData
         $msg = $msg_len . $msg;
         $rs  = $client->send($msg);
         if ($rs === false) {
+            Log::error(__METHOD__ . __LINE__);
             return false;
         }
         $data = $client->recv(4096, 0);
         if ($data === false) {
+            Log::error(__METHOD__ . __LINE__);
             return false;
         }
         return $data;

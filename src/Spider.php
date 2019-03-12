@@ -8,8 +8,9 @@
 
 namespace DHT;
 
-use Rych\Bencode\Bencode;
-use Rych\Bencode\Decoder;
+use DHT\Bcode\Decoder;
+use DHT\Bcode\Encoder;
+use SandFox\Bencode\Bencode;
 use Swoole\Process;
 
 /**
@@ -125,7 +126,7 @@ class Spider
      */
     protected function batchAddNode($msg)
     {
-        Log::info(__METHOD__.' 批量添加node');
+        Log::info(__METHOD__ . ' 批量添加node');
         // 先检查接收到的信息是否正确
         if (!isset($msg['r']['nodes']) || !isset($msg['r']['nodes'][1]))
             return;
@@ -181,7 +182,7 @@ class Spider
             Log::warning(__METHOD__ . ' ip 不合法:' . $ip);
             return false;
         }
-        $data = Bencode::encode($msg);
+        $data = Encoder::encode($msg);
         $this->udpServer->sendTo($ip, $port, $data);
         return true;
     }
@@ -254,7 +255,7 @@ class Spider
             // 否则伪造一个相邻id
             $target = Tool::getNeighbor($node_id, $this->node->getNodeId());
         }
-        Log::info(__METHOD__ . '查找朋友 ' . $ip . ' 是否在线');
+        Log::info(__METHOD__ . '查找朋友');
         // 定义发送数据 认识新朋友的。
         $msg = [
             't' => Tool::randomString(2),
@@ -276,7 +277,7 @@ class Spider
      */
     protected function onPing($msg, $ip, $port)
     {
-        Log::info(__METHOD__ . ' 朋友【' . $ip . '】正在确认你是否在线');
+        // Log::info(__METHOD__ . ' 朋友【' . $ip . '】正在确认你是否在线');
         // 获取对端node id
         $id = $msg['a']['id'];
         // 生成回复数据
@@ -284,7 +285,7 @@ class Spider
             't' => $msg['t'],
             'y' => 'r',
             'r' => [
-                'id' => Tool::getNeighbor($id, $this->node->getNodeId())
+                'id' => $this->node->getNodeId()
             ]
         ];
         // 将node加入路由表
@@ -300,7 +301,7 @@ class Spider
      */
     protected function onFindNode($msg, $ip, $port)
     {
-        Log::info(__METHOD__ . ' 朋友【' . $ip . '】向你发出寻找节点的请求');
+        // Log::info(__METHOD__ . ' 朋友【' . $ip . '】向你发出寻找节点的请求');
         // 获取对端node id
         $id = $msg['a']['id'];
         // 生成回复数据
@@ -411,6 +412,8 @@ class Spider
                     // todo 记录结果
                     if ($rs !== false) {
                         Log::metadata(json_encode($rs, JSON_UNESCAPED_UNICODE));
+                    } else {
+                        Log::error('获取metaData信息失败');
                     }
                 }
                 $worker->exit(0);
